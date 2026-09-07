@@ -1,2 +1,2 @@
-# Mega-Project
+# CivicResolve
 Public Complaints and Work Management System
