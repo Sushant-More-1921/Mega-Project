@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0B4EA2;
+  --color-primary-dark: #083B7A;
+  --color-primary-light: #EAF2FF;
+
+  --color-ai: #5B21B6;
+  --color-ai-light: #F3E8FF;
+  --color-ai-border: #DDD6FE;
+
+  --color-warning: #F59E0B;
+  --color-warning-light: #FFF7E6;
+  --color-warning-border: #FDE68A;
+
+  --color-success: #16A34A;
+  --color-success-light: #ECFDF3;
+  --color-success-border: #BBF7D0;
+
+  --color-teal: #0F766E;
+  --color-teal-light: #ECFEFF;
+  --color-teal-border: #99F6E4;
+
+  --color-danger: #DC2626;
+  --color-danger-light: #FEF2F2;
+  --color-danger-border: #FECACA;
+
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-secondary: #F1F5F9;
+
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748B;
+
+  --color-border-subtle: #E2E8F0;
+  --color-border-dark: #CBD5E1;
+}
+
+:root {
+  --primary: #0B4EA2;
+  --primary-dark: #083B7A;
+  --primary-light: #EAF2FF;
+
+  --ai: #5B21B6;
+  --ai-light: #F3E8FF;
+  --ai-border: #DDD6FE;
+
+  --warning: #F59E0B;
+  --warning-light: #FFF7E6;
+  --warning-border: #FDE68A;
+
+  --success: #16A34A;
+  --success-light: #ECFDF3;
+  --success-border: #BBF7D0;
+
+  --teal: #0F766E;
+  --teal-light: #ECFEFF;
+  --teal-border: #99F6E4;
+
+  --danger: #DC2626;
+  --danger-light: #FEF2F2;
+  --danger-border: #FECACA;
+
+  --background: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-secondary: #F1F5F9;
+
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+
+  --border: #E2E8F0;
+  --border-dark: #CBD5E1;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-inter, system-ui, -apple-system, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
