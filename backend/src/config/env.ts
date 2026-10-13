@@ -8,7 +8,14 @@ const envSchema = z.object({
   PORT: z.string().default('5000'),
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string(),
-  // Add other env vars here later as needed
+  // External SMS & OTP Provider configurations (optional)
+  FAST2SMS_API_KEY: z.string().optional(),
+  TWOFACTOR_API_KEY: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_PHONE_NUMBER: z.string().optional(),
+  OTP_PROVIDER_URL: z.string().optional(),
+  OTP_PROVIDER_KEY: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);
