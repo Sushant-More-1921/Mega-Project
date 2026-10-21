@@ -13,22 +13,38 @@ import {
   MapPin,
   Share2,
   Check,
+  Sparkles,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/common/status-badge";
 import { PriorityBadge } from "@/components/common/priority-badge";
-import { getIncidentOrComplaintByTracking } from "@/lib/db/incidents-db";
-import { trackComplaintApi } from "@/lib/api/complaints";
+import {
+  askComplaintAssistantApi,
+  trackComplaintApi,
+  BackendComplaintStatus,
+  TrackedComplaint,
+} from "@/lib/api/complaint-client";
 import { MasterIncident, CitizenReport } from "@/types/incident";
-import { Complaint } from "@/types/complaint";
+import { Complaint, ComplaintStatus } from "@/types/complaint";
 import ROUTES from "@/config/routes";
+
+const TRACKED_STATUS_MAP: Record<BackendComplaintStatus, ComplaintStatus> = {
+  SUBMITTED: "SUBMITTED",
+  UNDER_REVIEW: "VALIDATING",
+  ASSIGNED: "ASSIGNED",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+  CLOSED: "CLOSED",
+  REJECTED: "REJECTED",
+};
 
 function TrackComplaintContent() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id") || "";
 
-  const [searchId, setSearchId] = useState(initialId || "CMP-1042");
-  const [activeQuery, setActiveQuery] = useState(initialId || "CMP-1042");
+  const [searchId, setSearchId] = useState(initialId);
+  const [activeQuery, setActiveQuery] = useState(initialId);
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -40,6 +56,128 @@ function TrackComplaintContent() {
   } | null>(null);
 
   const [hasSearched, setHasSearched] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantQuestion, setAssistantQuestion] = useState("");
+  const [assistantAnswer, setAssistantAnswer] = useState<string | null>(null);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
+  const [isAskingAssistant, setIsAskingAssistant] = useState(false);
+
+  const mapTrackedComplaint = (c: TrackedComplaint) => {
+    const status = TRACKED_STATUS_MAP[c.status];
+    const coordinates =
+      c.latitude != null && c.longitude != null
+        ? { lat: c.latitude, lng: c.longitude }
+        : { lat: 0, lng: 0 };
+    const createdAt = new Date(c.createdAt).toLocaleString();
+    const slaDeadline = c.slaDeadline
+      ? new Date(c.slaDeadline).toLocaleString()
+      : "Not available";
+    const timeline = (c.timeline || []).map((item) => ({
+      status: TRACKED_STATUS_MAP[item.status],
+      timestamp: new Date(item.createdAt).toLocaleString(),
+      note: item.note,
+      author: item.author,
+    }));
+    const complaint = {
+      id: c.id,
+      trackingNumber: c.trackingNumber,
+      title: c.title,
+      description: c.description,
+      category: c.category,
+      subcategory: c.subcategory || undefined,
+      divisionId: c.divisionId || "div-kolhapur",
+      divisionName: c.divisionName || "Kolhapur Division",
+      districtId: c.districtId || "dist-kolhapur",
+      districtName: c.districtName || "Kolhapur District",
+      authorityId: c.authorityId || "auth-kmc",
+      authorityName: c.authorityName || "Kolhapur Municipal Corporation (KMC)",
+      departmentId: c.departmentId || "",
+      department: c.department?.name || "Awaiting department allocation",
+      location: c.location,
+      region: c.region || "Not specified",
+      coordinates,
+      status,
+      priority: c.priority,
+      assignedOfficer: c.assignedOfficerName || undefined,
+      assignedOfficerId: c.assignedOfficerId || undefined,
+      citizenMobile: c.citizen?.phoneNumber || "",
+      citizenName: c.citizen?.name || "Citizen",
+      date: c.createdAt.slice(0, 10),
+      createdAt,
+      updatedAt: new Date(c.updatedAt).toLocaleString(),
+      imageUrl: c.imageUrl || undefined,
+      aiConfidence: c.aiConfidence == null ? undefined : Math.round(c.aiConfidence * 100),
+      aiSuggestedCategory: c.aiSuggestedCategory || undefined,
+      aiReasoning: c.aiReasoning || undefined,
+      timeline,
+      routingAuditTrail: [],
+    } satisfies Complaint;
+    const parsedDeadline = c.slaDeadline ? new Date(c.slaDeadline).getTime() : Date.now();
+    const remainingMinutes = Math.round((parsedDeadline - Date.now()) / 60000);
+    const incident: MasterIncident = {
+      id: c.id,
+      incidentNumber: c.trackingNumber,
+      title: c.title,
+      description: c.description,
+      category: c.category,
+      subcategory: c.subcategory || undefined,
+      divisionId: complaint.divisionId,
+      divisionName: complaint.divisionName,
+      districtId: complaint.districtId,
+      districtName: complaint.districtName,
+      authorityId: complaint.authorityId,
+      authorityName: complaint.authorityName,
+      departmentId: complaint.departmentId,
+      department: complaint.department,
+      location: c.location,
+      region: complaint.region,
+      coordinates,
+      status,
+      priority: c.priority,
+      assignedOfficer: c.assignedOfficerName || undefined,
+      assignedOfficerId: c.assignedOfficerId || undefined,
+      complaintCount: 1,
+      supportingReports: [],
+      firstReportedAt: createdAt,
+      lastReportedAt: complaint.updatedAt,
+      createdAtTimestamp: new Date(c.createdAt).getTime(),
+      lastReportedTimestamp: new Date(c.updatedAt).getTime(),
+      slaHours: c.slaHours || 24,
+      slaDeadline,
+      slaRemainingMinutes: remainingMinutes,
+      isSlaBreached: remainingMinutes < 0,
+      imageUrl: c.imageUrl || undefined,
+      aiConfidence: complaint.aiConfidence ?? 0,
+      aiSuggestedCategory: c.aiSuggestedCategory || c.category,
+      aiReasoning: c.aiReasoning || "AI triage assessment",
+      timeline,
+      routingAuditTrail: [],
+      resolutionEvidence: c.resolutionRemarks
+        ? {
+            remarks: c.resolutionRemarks,
+            imageUrl: c.resolutionImageUrl || "",
+            uploadedAt: complaint.updatedAt,
+            uploadedBy: c.assignedOfficerName || "Field Officer",
+            inspectionPassed: true,
+          }
+        : undefined,
+    };
+    const report: CitizenReport = {
+      id: c.id,
+      trackingNumber: c.trackingNumber,
+      citizenName: complaint.citizenName || "Citizen",
+      citizenMobile: complaint.citizenMobile,
+      description: c.description,
+      location: c.location,
+      coordinates,
+      imageUrl: c.imageUrl || undefined,
+      reportedAt: createdAt,
+      timestamp: new Date(c.createdAt).getTime(),
+      channel: "WEB_PORTAL",
+      aiConfidence: complaint.aiConfidence,
+    };
+    return { incident, complaint, report };
+  };
 
   useEffect(() => {
     if (!activeQuery.trim()) return;
@@ -54,78 +192,20 @@ function TrackComplaintContent() {
       trackComplaintApi(activeQuery.trim())
         .then((c) => {
           if (!isMounted) return;
-          const incidentObj: MasterIncident = {
-            id: c.id,
-            incidentNumber: c.trackingNumber,
-            title: c.title,
-            description: c.description,
-            category: c.category,
-            subcategory: c.subcategory,
-            divisionId: c.divisionId || "div-kolhapur",
-            divisionName: c.divisionName || "Kolhapur Division",
-            districtId: c.districtId || "dist-kolhapur",
-            districtName: c.districtName || "Kolhapur District",
-            authorityId: c.authorityId || "auth-kmc",
-            authorityName: c.authorityName || "Kolhapur Municipal Corporation (KMC)",
-            departmentId: c.departmentId || "dept-kmc-waste",
-            department: c.department || "Solid Waste Management",
-            location: c.location,
-            region: c.region || "North Zone",
-            coordinates: c.coordinates || { lat: 16.712, lng: 74.238 },
-            status: c.status,
-            priority: c.priority,
-            assignedOfficer: c.assignedOfficer,
-            assignedOfficerId: c.assignedOfficerId,
-            complaintCount: 1,
-            supportingReports: [],
-            firstReportedAt: c.createdAt,
-            lastReportedAt: c.updatedAt || c.createdAt,
-            createdAtTimestamp: Date.now(),
-            lastReportedTimestamp: Date.now(),
-            slaHours: 24,
-            slaDeadline: "Within 24 Hours",
-            slaRemainingMinutes: 1440,
-            isSlaBreached: false,
-            imageUrl: c.imageUrl,
-            aiConfidence: c.aiConfidence || 95,
-            aiSuggestedCategory: c.aiSuggestedCategory || c.category,
-            aiReasoning: c.aiReasoning || "Automated triage classification",
-            timeline: c.timeline || [
-              { status: c.status, timestamp: c.createdAt, note: "Complaint logged", author: "Citizen" },
-            ],
-            routingAuditTrail: c.routingAuditTrail || [],
-            resolutionEvidence: c.resolutionEvidence,
-          };
-
-          setResult({
-            incident: incidentObj,
-            complaint: c,
-            report: {
-              id: c.id,
-              trackingNumber: c.trackingNumber,
-              citizenName: c.citizenName || "Citizen",
-              citizenMobile: c.citizenMobile || "",
-              description: c.description,
-              location: c.location,
-              coordinates: c.coordinates || { lat: 16.712, lng: 74.238 },
-              imageUrl: c.imageUrl,
-              reportedAt: c.createdAt,
-              timestamp: Date.now(),
-              channel: "WEB_PORTAL",
-            },
-          });
+          setResult(mapTrackedComplaint(c));
+          setAssistantAnswer(null);
+          setAssistantError(null);
           setHasSearched(true);
           setIsLoading(false);
         })
-        .catch(() => {
+        .catch((error: Error & { statusCode?: number }) => {
           if (!isMounted) return;
-          // 2. Fallback to local storage
-          const match = getIncidentOrComplaintByTracking(activeQuery.trim());
-          if (match) {
-            setResult(match);
-          } else {
+          if (error.statusCode === 404) {
             setResult(null);
             setSearchError(`Complaint Number "${activeQuery.trim()}" not found.`);
+          } else {
+            setResult(null);
+            setSearchError(error.message || "Could not load complaint status.");
           }
           setHasSearched(true);
           setIsLoading(false);
@@ -142,6 +222,31 @@ function TrackComplaintContent() {
     e.preventDefault();
     if (searchId.trim()) {
       setActiveQuery(searchId.trim());
+      setAssistantOpen(false);
+      setAssistantAnswer(null);
+      setAssistantError(null);
+    }
+  };
+
+  const handleAskAssistant = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!result || !assistantQuestion.trim()) return;
+    setIsAskingAssistant(true);
+    setAssistantError(null);
+    setAssistantAnswer(null);
+    try {
+      const response = await askComplaintAssistantApi({
+        tracking_number: result.complaint.trackingNumber,
+        question: assistantQuestion.trim(),
+        language: "en",
+      });
+      setAssistantAnswer(response.answer);
+    } catch (error) {
+      setAssistantError(
+        error instanceof Error ? error.message : "The assistant could not answer right now."
+      );
+    } finally {
+      setIsAskingAssistant(false);
     }
   };
 
@@ -232,7 +337,7 @@ function TrackComplaintContent() {
           {/* Quick Demo Pre-fills */}
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-[#F1F5F9] text-xs">
             <span className="text-[#64748B] font-medium">Sample Complaint Numbers:</span>
-            {["CMP-2026-1042", "CMP-2026-1041", "CMP-1042", "CMP-1041"].map((id) => (
+            {["CMP-2026-1042", "CMP-2026-1041"].map((id) => (
               <button
                 key={id}
                 type="button"
@@ -373,6 +478,45 @@ function TrackComplaintContent() {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs p-6">
+              <button
+                type="button"
+                onClick={() => setAssistantOpen((open) => !open)}
+                aria-expanded={assistantOpen}
+                className="flex items-center gap-2 text-sm font-bold text-[#0B4EA2]"
+              >
+                <Sparkles className="w-4 h-4" />
+                Ask AI about this complaint
+              </button>
+              {assistantOpen && (
+                <div className="mt-4 space-y-3">
+                  <form onSubmit={handleAskAssistant} className="flex gap-2">
+                    <input
+                      value={assistantQuestion}
+                      onChange={(event) => setAssistantQuestion(event.target.value)}
+                      maxLength={2000}
+                      required
+                      placeholder="Ask about the current status or next steps"
+                      className="min-w-0 flex-1 h-10 px-3 rounded-lg border border-[#CBD5E1] text-sm focus:outline-none focus:border-[#0B4EA2] focus:ring-2 focus:ring-[#EAF2FF]"
+                    />
+                    <Button type="submit" size="sm" isLoading={isAskingAssistant} aria-label="Ask AI">
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </form>
+                  {assistantAnswer && (
+                    <p className="p-3 rounded-lg bg-[#F3E8FF] text-sm text-[#5B21B6]" aria-live="polite">
+                      {assistantAnswer}
+                    </p>
+                  )}
+                  {assistantError && (
+                    <p className="p-3 rounded-lg bg-[#FEF2F2] text-sm text-[#B91C1C]" role="alert">
+                      {assistantError}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Audit Timeline Card */}

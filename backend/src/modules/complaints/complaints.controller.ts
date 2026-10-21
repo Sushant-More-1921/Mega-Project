@@ -8,19 +8,26 @@ const complaintsService = new ComplaintsService();
 const createComplaintSchema = z.object({
   title: z.string().optional(),
   description: z.string().min(10, 'Complaint description must be at least 10 characters'),
-  category: z.string().min(1, 'Complaint category is required'),
+  category: z.string().optional(),
+  language: z.enum(['en', 'hi', 'mr']).optional(),
   subcategory: z.string().optional(),
   divisionId: z.string().optional(),
   divisionName: z.string().optional(),
   authorityId: z.string().optional(),
   authorityName: z.string().optional(),
   departmentId: z.string().optional(),
-  location: z.string().min(3, 'Location is required'),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  location: z.string().min(3).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
   imageUrl: z.string().optional(),
-  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH']).optional(),
-});
+  imageBase64: z.string().max(12_000_000).optional(),
+  imageContentType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
+}).refine(
+  (data) =>
+    (data.latitude === undefined) === (data.longitude === undefined) &&
+    (data.imageBase64 === undefined) === (data.imageContentType === undefined),
+  'Coordinates and image content type must be provided with their corresponding values'
+);
 
 const updateStatusSchema = z.object({
   status: z.enum([

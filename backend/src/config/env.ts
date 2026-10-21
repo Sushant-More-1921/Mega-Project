@@ -6,6 +6,8 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('5000'),
+  AI_SERVICE_URL: z.string().url().default('http://localhost:8000'),
+  AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string(),
   // External SMS & OTP Provider configurations (optional)
@@ -16,6 +18,9 @@ const envSchema = z.object({
   TWILIO_PHONE_NUMBER: z.string().optional(),
   OTP_PROVIDER_URL: z.string().optional(),
   OTP_PROVIDER_KEY: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

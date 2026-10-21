@@ -1,19 +1,16 @@
-import os
+from pathlib import Path
+
 import joblib
 
 
-MODEL_PATH = os.path.join(
-    "models",
-    "complaint_classifier",
-    "model.joblib"
-)
+MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "complaint_classifier" / "model.joblib"
 
 
 class ComplaintClassifier:
 
     def __init__(self):
 
-        if not os.path.exists(MODEL_PATH):
+        if not MODEL_PATH.is_file():
             raise FileNotFoundError(
                 f"Model not found: {MODEL_PATH}"
             )

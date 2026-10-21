@@ -1,20 +1,24 @@
 import { prisma } from '../../config/database';
+import { randomUUID } from 'crypto';
+import { AIAnalysis, AIComplaintContext, aiService } from '../ai/ai.service';
 
 export interface CreateComplaintInput {
   title?: string;
   description: string;
-  category: string;
+  category?: string;
+  language?: 'en' | 'hi' | 'mr';
   subcategory?: string;
   divisionId?: string;
   divisionName?: string;
   authorityId?: string;
   authorityName?: string;
   departmentId?: string;
-  location: string;
+  location?: string;
   latitude?: number;
   longitude?: number;
   imageUrl?: string;
-  priority?: string;
+  imageBase64?: string;
+  imageContentType?: 'image/jpeg' | 'image/png' | 'image/webp';
 }
 
 export class ComplaintsService {
@@ -48,17 +52,110 @@ export class ComplaintsService {
       throw error;
     }
 
-    // Generate unique tracking number (CMP-2026-XXXX)
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const trackingNumber = `CMP-2026-${randomSuffix}`;
+    const complaintId = randomUUID();
+    const trackingNumber = `CMP-${new Date().getFullYear()}-${randomUUID()
+      .replace(/-/g, '')
+      .slice(0, 8)
+      .toUpperCase()}`;
+    const previousComplaints = data.latitude != null && data.longitude != null
+      ? await prisma.complaint.findMany({
+          where: {
+            latitude: { not: null },
+            longitude: { not: null },
+          },
+          select: {
+            id: true,
+            citizenId: true,
+            description: true,
+            latitude: true,
+            longitude: true,
+            category: true,
+            issueClusterId: true,
+            createdAt: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 500,
+        })
+      : [];
 
-    const slaHours = this.getSlaHours(data.category, data.priority);
+    const complaintContext: AIComplaintContext[] = previousComplaints.flatMap(
+      (complaint) => {
+        if (complaint.latitude == null || complaint.longitude == null) {
+          return [];
+        }
+        return [{
+          id: complaint.id,
+          citizen_id: complaint.citizenId,
+          text: complaint.description,
+          latitude: complaint.latitude,
+          longitude: complaint.longitude,
+          category: complaint.category,
+          issue_cluster_id: complaint.issueClusterId,
+          created_at: complaint.createdAt.toISOString(),
+          status: complaint.status,
+        }];
+      }
+    );
+    const clusterGroups = new Map<string, AIComplaintContext[]>();
+    for (const complaint of complaintContext) {
+      if (!complaint.issue_cluster_id) continue;
+      const cluster = clusterGroups.get(complaint.issue_cluster_id) || [];
+      cluster.push(complaint);
+      clusterGroups.set(complaint.issue_cluster_id, cluster);
+    }
+    const issueClusters = Array.from(clusterGroups.entries()).map(
+      ([issueClusterId, complaints]) => ({
+        issue_cluster_id: issueClusterId,
+        category: complaints[0].category,
+        location: {
+          latitude: complaints[0].latitude,
+          longitude: complaints[0].longitude,
+        },
+        report_count: complaints.length,
+        unique_citizen_count: new Set(
+          complaints.map((complaint) => complaint.citizen_id)
+        ).size,
+      })
+    );
+    const imageResult = data.imageBase64 && data.imageContentType
+      ? await aiService.analyzeImage({
+          imageBase64: data.imageBase64,
+          contentType: data.imageContentType,
+          text: data.description,
+          language: data.language,
+        })
+      : null;
+    const imageUrl = data.imageBase64 && data.imageContentType
+      ? await aiService.uploadComplaintImage(data.imageBase64, data.imageContentType)
+      : data.imageUrl;
+    const analysisText = imageResult
+      ? `${data.description}\nVisible photo evidence: ${imageResult.image_description}`
+      : data.description;
+    const aiResult: AIAnalysis = await aiService.analyzeComplaint({
+      text: analysisText,
+      language: data.language,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      complaintId,
+      citizenId: user.id,
+      previousComplaints: complaintContext,
+      issueClusters,
+    });
+    const category = aiResult.category;
+    const priority = this.mapPriority(aiResult.priority);
+    const location =
+      data.location ||
+      (data.latitude != null && data.longitude != null
+        ? `GPS ${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}`
+        : 'Location not provided');
+    const slaHours = this.getSlaHours(category, priority);
     const slaDeadline = new Date(Date.now() + slaHours * 60 * 60 * 1000);
 
     // Auto-detect default department if not provided
     let departmentId = data.departmentId;
     if (!departmentId) {
-      const catLower = data.category.toLowerCase();
+      const catLower = category.toLowerCase();
       let deptNamePattern = 'Solid Waste Management';
       if (catLower.includes('water')) deptNamePattern = 'Hydraulics & Water Supply';
       else if (catLower.includes('road')) deptNamePattern = 'Road Infrastructure & Maintenance';
@@ -77,7 +174,7 @@ export class ComplaintsService {
     // Auto-assign lowest workload officer if available
     let assignedOfficerId: string | null = null;
     let assignedOfficerName: string | null = null;
-    if (departmentId) {
+    if (departmentId && !aiResult.manual_review) {
       const availableOfficer = await prisma.officer.findFirst({
         where: { departmentId },
         orderBy: { activeCases: 'asc' },
@@ -93,25 +190,31 @@ export class ComplaintsService {
       }
     }
 
-    const priority = data.priority || (slaHours <= 4 ? 'HIGH' : 'MEDIUM');
-    const initialStatus = assignedOfficerId ? 'ASSIGNED' : 'SUBMITTED';
+    const initialStatus = aiResult.manual_review
+      ? 'UNDER_REVIEW'
+      : assignedOfficerId
+        ? 'ASSIGNED'
+        : 'SUBMITTED';
 
     const complaint = await prisma.complaint.create({
       data: {
+        id: complaintId,
         trackingNumber,
-        title: data.title || `${data.category}: ${data.location}`,
+        title: data.title || `${category}: ${location}`,
         description: data.description,
-        category: data.category,
+        category,
         subcategory: data.subcategory,
         divisionId: data.divisionId || 'div-kolhapur',
         divisionName: data.divisionName || 'Kolhapur Division',
+        districtId: 'dist-kolhapur',
+        districtName: 'Kolhapur District',
         authorityId: data.authorityId || 'auth-kmc',
         authorityName: data.authorityName || 'Kolhapur Municipal Corporation (KMC)',
         departmentId,
-        location: data.location,
+        location,
         latitude: data.latitude,
         longitude: data.longitude,
-        imageUrl: data.imageUrl,
+        imageUrl,
         status: initialStatus,
         priority,
         citizenId: user.id,
@@ -119,6 +222,18 @@ export class ComplaintsService {
         assignedOfficerName,
         slaHours,
         slaDeadline,
+        aiConfidence: aiResult.category_confidence,
+        aiSuggestedCategory: aiResult.category,
+        aiReasoning: [
+          this.createAiReasoning(aiResult),
+          imageResult ? `Photo analysis: ${imageResult.image_description}` : null,
+        ].filter(Boolean).join(' '),
+        aiLanguage: aiResult.language,
+        issueClusterId: aiResult.issue_cluster_id,
+        duplicateOfId:
+          aiResult.duplicate_detection?.issue_cluster?.duplicate_of != null
+            ? String(aiResult.duplicate_detection.issue_cluster.duplicate_of)
+            : null,
         timeline: {
           create: [
             {
@@ -126,6 +241,12 @@ export class ComplaintsService {
               note: 'Complaint lodged by citizen with location and evidence.',
               author: user.name || 'Citizen',
               authorRole: 'CITIZEN',
+            },
+            {
+              status: aiResult.manual_review ? 'UNDER_REVIEW' : 'SUBMITTED',
+              note: this.createAiReasoning(aiResult),
+              author: 'CivicResolve AI',
+              authorRole: 'SYSTEM',
             },
             ...(assignedOfficerName
               ? [
@@ -147,6 +268,25 @@ export class ComplaintsService {
     });
 
     return complaint;
+  }
+
+  private mapPriority(priority: string): string {
+    const normalized = priority.toLowerCase();
+    if (normalized === 'critical' || normalized === 'very_high') return 'VERY_HIGH';
+    if (normalized === 'high') return 'HIGH';
+    if (normalized === 'medium') return 'MEDIUM';
+    if (normalized === 'low') return 'LOW';
+    const error = new Error(`AI returned an unsupported priority: ${priority}`);
+    Object.assign(error, { statusCode: 502 });
+    throw error;
+  }
+
+  private createAiReasoning(result: AIAnalysis): string {
+    const confidence = `${Math.round(result.category_confidence * 100)}%`;
+    const reviewNote = result.manual_review
+      ? ' Manual review is recommended.'
+      : '';
+    return `AI classified this as ${result.category} with ${confidence} confidence and ${result.priority} priority.${reviewNote}`;
   }
 
   /**
