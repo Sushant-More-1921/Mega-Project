@@ -55,7 +55,7 @@ class IssueCluster(BaseModel):
 
 class HotspotRequest(BaseModel):
 
-    issue_clusters: list[IssueCluster] = []
+    issue_clusters: list[IssueCluster] = Field(default_factory=list)
 
 
 # =========================================================

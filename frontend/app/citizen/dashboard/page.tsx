@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -27,13 +27,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/common/status-badge";
 import { PriorityBadge } from "@/components/common/priority-badge";
-import {
-  getCitizenComplaints,
-  saveCitizenFeedback,
-} from "@/lib/db/incidents-db";
 import { subscribeToRealTime } from "@/lib/realtime/events";
 import { getSessionUser, getSessionToken, clearSession } from "@/lib/auth/session";
-import { getMyComplaintsApi } from "@/lib/api/complaints";
+import {
+  getMyComplaintsApi,
+  TrackedComplaint,
+} from "@/lib/api/complaint-client";
 import { Complaint, ComplaintStatus, CitizenFeedback } from "@/types/complaint";
 import { AuthUser } from "@/types/auth";
 import ROUTES from "@/config/routes";
@@ -45,6 +44,56 @@ interface CitizenProfileData {
   address: string;
   aadhaarMasked: string;
   smsAlerts: boolean;
+}
+
+function toComplaint(
+  item: TrackedComplaint,
+  mobileNumber: string
+): Complaint {
+  return {
+    id: item.id,
+    trackingNumber: item.trackingNumber,
+    title: item.title,
+    description: item.description,
+    category: item.category,
+    subcategory: item.subcategory || undefined,
+    divisionId: item.divisionId || "",
+    divisionName: item.divisionName || "",
+    districtId: item.districtId || "",
+    districtName: item.districtName || "",
+    authorityId: item.authorityId || "",
+    authorityName: item.authorityName || "",
+    departmentId: item.departmentId || "",
+    departmentName: item.department?.name || "",
+    department: item.department?.name || "Not assigned",
+    location: item.location,
+    region: item.districtName || "",
+    coordinates: {
+      lat: item.latitude ?? 0,
+      lng: item.longitude ?? 0,
+    },
+    status: item.status,
+    priority: item.priority,
+    assignedOfficer: item.assignedOfficerName || undefined,
+    assignedOfficerId: item.assignedOfficerId || undefined,
+    citizenMobile: mobileNumber,
+    citizenName: item.citizen?.name || undefined,
+    date: item.createdAt.slice(0, 10),
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    imageUrl: item.imageUrl || undefined,
+    aiConfidence:
+      item.aiConfidence == null ? undefined : Math.round(item.aiConfidence * 100),
+    aiSuggestedCategory: item.aiSuggestedCategory || undefined,
+    aiReasoning: item.aiReasoning || undefined,
+    timeline: (item.timeline || []).map((entry) => ({
+      status: entry.status,
+      timestamp: entry.createdAt,
+      note: entry.note,
+      author: entry.author,
+    })),
+    routingAuditTrail: [],
+  };
 }
 
 export default function CitizenDashboardPage() {
@@ -60,6 +109,7 @@ export default function CitizenDashboardPage() {
 
   // Complaints Data
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [complaintLoadError, setComplaintLoadError] = useState<string | null>(null);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
 
   // Filters & Search
@@ -91,25 +141,38 @@ export default function CitizenDashboardPage() {
   const [isReopenRequested, setIsReopenRequested] = useState<boolean>(false);
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
 
-  // Load User & Complaints from real backend or local DB
-  const loadData = async (authToken: string, mobileNumber?: string) => {
+  const loadData = useCallback(async (mobileNumber: string, userId: string) => {
     try {
-      const backendData = await getMyComplaintsApi(authToken);
-      if (backendData && backendData.length > 0) {
-        setComplaints(backendData);
-        return;
+      const backendData = await getMyComplaintsApi();
+      let feedbackByTracking: Record<string, CitizenFeedback> = {};
+      try {
+        const savedFeedback = localStorage.getItem(`civic_feedback_${userId}`);
+        if (savedFeedback) {
+          const parsed: unknown = JSON.parse(savedFeedback);
+          if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+            feedbackByTracking = parsed as Record<string, CitizenFeedback>;
+          }
+        }
+      } catch (error) {
+        console.error("Saved citizen feedback could not be loaded.", error);
       }
-    } catch (e) {
-      console.warn("Backend complaints load notice:", e);
+      setComplaints(
+        backendData.map((item) => ({
+          ...toComplaint(item, mobileNumber),
+          ...(feedbackByTracking[item.trackingNumber]
+            ? { feedback: feedbackByTracking[item.trackingNumber] }
+            : {}),
+        }))
+      );
+      setComplaintLoadError(null);
+    } catch (error) {
+      setComplaintLoadError(
+        error instanceof Error
+          ? error.message
+          : "Could not load your complaints. Please try again."
+      );
     }
-
-    try {
-      const localData = getCitizenComplaints(mobileNumber);
-      setComplaints(localData || []);
-    } catch (e) {
-      console.warn("Local storage fallback notice:", e);
-    }
-  };
+  }, []);
 
   useEffect(() => {
     const sessionToken = getSessionToken();
@@ -139,7 +202,7 @@ export default function CitizenDashboardPage() {
         }
       }
 
-      loadData(sessionToken, sessionUser.mobileNumber);
+      loadData(sessionUser.mobileNumber, sessionUser.id);
       setIsAuthChecking(false);
     }, 0);
 
@@ -148,7 +211,7 @@ export default function CitizenDashboardPage() {
       const activeToken = getSessionToken();
       const activeUser = getSessionUser();
       if (activeToken && activeUser && isSubscribed) {
-        loadData(activeToken, activeUser.mobileNumber);
+        loadData(activeUser.mobileNumber, activeUser.id);
       }
     });
 
@@ -157,7 +220,7 @@ export default function CitizenDashboardPage() {
       clearTimeout(timer);
       unsubscribe();
     };
-  }, [router]);
+  }, [loadData, router]);
 
   const handleLogout = () => {
     clearSession();
@@ -207,12 +270,21 @@ export default function CitizenDashboardPage() {
       reopenRequested: isReopenRequested,
     };
 
-    saveCitizenFeedback(feedbackComplaint.trackingNumber, feedbackPayload);
-
-    // Refresh local complaints list
-    if (currentUser) {
-      const fresh = getCitizenComplaints(currentUser.mobileNumber);
-      setComplaints(fresh);
+    if (currentUser && typeof window !== "undefined") {
+      const storageKey = `civic_feedback_${currentUser.id}`;
+      const savedFeedback = JSON.parse(localStorage.getItem(storageKey) || "{}") as Record<
+        string,
+        CitizenFeedback
+      >;
+      savedFeedback[feedbackComplaint.trackingNumber] = feedbackPayload;
+      localStorage.setItem(storageKey, JSON.stringify(savedFeedback));
+      setComplaints((current) =>
+        current.map((complaint) =>
+          complaint.trackingNumber === feedbackComplaint.trackingNumber
+            ? { ...complaint, feedback: feedbackPayload }
+            : complaint
+        )
+      );
     }
 
     setFeedbackComplaint(null);
@@ -394,6 +466,11 @@ export default function CitizenDashboardPage() {
             >
               ✕
             </button>
+          </div>
+        )}
+        {complaintLoadError && (
+          <div role="alert" className="p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#B91C1C] font-medium">
+            {complaintLoadError}
           </div>
         )}
 

@@ -1,28 +1,17 @@
-import os
-import numpy as np
-import pandas as pd
-import faiss
+from pathlib import Path
 
-from sentence_transformers import SentenceTransformer
+import numpy as np
 
 
 # =========================================================
 # PATHS AND MODEL
 # =========================================================
 
-DATA_PATH = "data/complaints.csv"
-
-INDEX_DIR = "models/faiss_index"
-
-INDEX_PATH = os.path.join(
-    INDEX_DIR,
-    "complaints.index"
-)
-
-TEXTS_PATH = os.path.join(
-    INDEX_DIR,
-    "complaints_texts.npy"
-)
+SERVICE_ROOT = Path(__file__).resolve().parents[2]
+DATA_PATH = SERVICE_ROOT / "data" / "complaints.csv"
+INDEX_DIR = SERVICE_ROOT / "models" / "faiss_index"
+INDEX_PATH = INDEX_DIR / "complaints.index"
+TEXTS_PATH = INDEX_DIR / "complaints_texts.npy"
 
 MODEL_NAME = (
     "sentence-transformers/all-MiniLM-L6-v2"
@@ -36,49 +25,33 @@ MODEL_NAME = (
 class ComplaintSimilarity:
 
     def __init__(self):
-
-        print("Loading embedding model...")
-
-        self.model = SentenceTransformer(
-            MODEL_NAME
-        )
-
+        self.model = None
         self.index = None
         self.texts = None
 
-        if (
-            os.path.exists(INDEX_PATH)
-            and
-            os.path.exists(TEXTS_PATH)
-        ):
+    def _ensure_model(self):
+        if self.model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Duplicate detection requires the optional dependencies in "
+                    "requirements-similarity.txt."
+                ) from exc
 
-            print(
-                "Loading existing FAISS index..."
-            )
+            self.model = SentenceTransformer(MODEL_NAME)
 
-            self.index = faiss.read_index(
-                INDEX_PATH
-            )
+        if self.index is None and INDEX_PATH.is_file() and TEXTS_PATH.is_file():
+            try:
+                import faiss
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Duplicate detection requires the optional dependencies in "
+                    "requirements-similarity.txt."
+                ) from exc
 
-            self.texts = np.load(
-                TEXTS_PATH,
-                allow_pickle=True
-            )
-
-            print(
-                f"Loaded {self.index.ntotal} "
-                "complaint embeddings."
-            )
-
-        else:
-
-            print(
-                "FAISS index not found."
-            )
-
-            print(
-                "Run the index-building script first."
-            )
+            self.index = faiss.read_index(str(INDEX_PATH))
+            self.texts = np.load(TEXTS_PATH, allow_pickle=True)
 
 
     # =====================================================
@@ -86,14 +59,21 @@ class ComplaintSimilarity:
     # =====================================================
 
     def build_index(self):
+        self._ensure_model()
+        try:
+            import faiss
+            import pandas as pd
+        except ImportError as exc:
+            raise RuntimeError(
+                "Building the similarity index requires the optional dependencies in "
+                "requirements-similarity.txt."
+            ) from exc
 
         print(
             "Loading complaint dataset..."
         )
 
-        df = pd.read_csv(
-            DATA_PATH
-        )
+        df = pd.read_csv(DATA_PATH)
 
         df = df.dropna(
             subset=["text"]
@@ -148,18 +128,12 @@ class ComplaintSimilarity:
             dtype=object
         )
 
-        os.makedirs(
-            INDEX_DIR,
-            exist_ok=True
-        )
+        INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
-        faiss.write_index(
-            self.index,
-            INDEX_PATH
-        )
+        faiss.write_index(self.index, str(INDEX_PATH))
 
         np.save(
-            TEXTS_PATH,
+            str(TEXTS_PATH),
             self.texts
         )
 
@@ -193,6 +167,8 @@ class ComplaintSimilarity:
             raise ValueError(
                 "Complaint text cannot be empty."
             )
+
+        self._ensure_model()
 
         if self.index is None:
 
@@ -410,6 +386,7 @@ class ComplaintSimilarity:
                 "matches": []
             }
 
+        self._ensure_model()
 
         new_latitude = float(
             new_latitude
