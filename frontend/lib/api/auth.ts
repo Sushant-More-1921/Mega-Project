@@ -11,7 +11,10 @@ import {
 } from "@/types/auth";
 import { isValidIndianMobile, maskMobileNumber } from "@/lib/validations/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+const API_ROOT = API_BASE_URL.endsWith("/api/v1")
+  ? API_BASE_URL
+  : `${API_BASE_URL}/api/v1`;
 
 /**
  * Standard simulated delay for smooth UX loading states when backend is offline
@@ -29,18 +32,21 @@ export async function sendOtpApi(mobileNumber: string): Promise<SendOtpResponse>
     throw new Error("Invalid mobile number. Must be a 10-digit Indian number starting with 6-9.");
   }
 
-  if (API_BASE_URL) {
-    const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+  if (API_ROOT) {
+    const res = await fetch(`${API_ROOT}/auth/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mobileNumber: `+91${cleanNumber}` }),
+      body: JSON.stringify({ phoneNumber: `+91${cleanNumber}` }),
     });
 
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.message || "Failed to send OTP. Please try again.");
     }
-    return data;
+    return {
+      ...data,
+      maskedMobile: maskMobileNumber(cleanNumber),
+    };
   }
 
   await simulateDelay(800);
@@ -74,12 +80,12 @@ export async function verifyOtpApi(
     throw new Error("Verification code must be exactly 6 digits.");
   }
 
-  if (API_BASE_URL) {
-    const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+  if (API_ROOT) {
+    const res = await fetch(`${API_ROOT}/auth/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mobileNumber: `+91${cleanNumber}`,
+        phoneNumber: `+91${cleanNumber}`,
         otp: cleanOtp,
         otpSessionId,
       }),
@@ -89,7 +95,14 @@ export async function verifyOtpApi(
     if (!res.ok) {
       throw new Error(data.message || "Invalid or expired OTP. Please try again.");
     }
-    return data;
+    return {
+      ...data,
+      user: {
+        ...data.user,
+        mobileNumber: data.user.phoneNumber || data.user.mobileNumber,
+        isVerified: true,
+      },
+    };
   }
 
   await simulateDelay(850);
@@ -133,18 +146,21 @@ export async function sendAdminOtpApi(mobileNumber: string): Promise<SendOtpResp
     throw new Error("Invalid administrative mobile number. Must be a 10-digit Indian number.");
   }
 
-  if (API_BASE_URL) {
-    const res = await fetch(`${API_BASE_URL}/api/admin/auth/send-otp`, {
+  if (API_ROOT) {
+    const res = await fetch(`${API_ROOT}/auth/admin/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mobileNumber: `+91${cleanNumber}`, portal: "ADMIN" }),
+      body: JSON.stringify({ phoneNumber: `+91${cleanNumber}` }),
     });
 
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.message || "Admin authentication failed. Unauthorized number.");
     }
-    return data;
+    return {
+      ...data,
+      maskedMobile: maskMobileNumber(cleanNumber),
+    };
   }
 
   await simulateDelay(850);
@@ -179,15 +195,14 @@ export async function verifyAdminOtpApi(
     throw new Error("Administrative 2FA code must be exactly 6 digits.");
   }
 
-  if (API_BASE_URL) {
-    const res = await fetch(`${API_BASE_URL}/api/admin/auth/verify-otp`, {
+  if (API_ROOT) {
+    const res = await fetch(`${API_ROOT}/auth/admin/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mobileNumber: `+91${cleanNumber}`,
+        phoneNumber: `+91${cleanNumber}`,
         otp: cleanOtp,
         otpSessionId,
-        portal: "ADMIN",
       }),
     });
 
@@ -195,7 +210,14 @@ export async function verifyAdminOtpApi(
     if (!res.ok) {
       throw new Error(data.message || "Invalid Admin OTP credentials.");
     }
-    return data;
+    return {
+      ...data,
+      user: {
+        ...data.user,
+        mobileNumber: data.user.phoneNumber || data.user.mobileNumber,
+        isVerified: true,
+      },
+    };
   }
 
   await simulateDelay(900);

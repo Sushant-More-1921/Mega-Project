@@ -1,18 +1,15 @@
-import os
+from pathlib import Path
+
 import joblib
 
 
-MODEL_PATH = os.path.join(
-    "models",
-    "priority_model",
-    "model.joblib"
-)
+MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "priority_model" / "model.joblib"
 
 
 class PriorityPredictor:
 
     def __init__(self):
-        if not os.path.exists(MODEL_PATH):
+        if not MODEL_PATH.is_file():
             raise FileNotFoundError(
                 f"Priority model not found: {MODEL_PATH}"
             )

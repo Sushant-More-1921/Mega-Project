@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { MulterError } from 'multer';
 import { z } from 'zod';
 
 export const errorMiddleware = (
@@ -20,7 +21,17 @@ export const errorMiddleware = (
     });
   }
 
-  const statusCode = err.statusCode || 500;
+  if (err instanceof MulterError) {
+    const statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(statusCode).json({
+      success: false,
+      message: statusCode === 413
+        ? 'Audio file must be smaller than 20 MB.'
+        : 'Invalid audio upload.',
+    });
+  }
+
+  const statusCode = err.statusCode || err.status || 500;
   const message = err.message || 'Internal Server Error';
 
   res.status(statusCode).json({

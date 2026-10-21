@@ -11,12 +11,15 @@ model User {
   id          String   @id @default(uuid())
   phoneNumber String   @unique
   name        String?
+  email       String?  @unique
+  designation String?
   role        Role     @default(CITIZEN)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
+  complaints   Complaint[]
 }
 
 enum Role {
@@ -29,8 +32,101 @@ enum Role {
 model Department {
   id          String   @id @default(uuid())
   name        String   @unique
+  code        String?  @unique
   description String?
   users       User[]
+  officers    Officer[]
+  complaints  Complaint[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Officer {
+  id           String   @id @default(uuid())
+  name         String
+  phoneNumber  String   @unique
+  designation  String?
+  badgeId      String?  @unique
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  activeCases  Int      @default(0)
+  resolvedCases Int     @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([departmentId, activeCases])
+}
+
+model Complaint {
+  id                   String   @id @default(uuid())
+  trackingNumber       String   @unique
+  title                String
+  description          String
+  category             String
+  subcategory          String?
+  divisionId           String
+  divisionName         String
+  districtId           String   @default("dist-kolhapur")
+  districtName         String   @default("Kolhapur District")
+  authorityId          String
+  authorityName        String
+  departmentId         String?
+  department           Department? @relation(fields: [departmentId], references: [id])
+  location             String
+  region               String   @default("North Zone")
+  latitude             Float?
+  longitude            Float?
+  imageUrl             String?
+  status               String   @default("SUBMITTED")
+  priority             String   @default("MEDIUM")
+  citizenId            String
+  citizen              User     @relation(fields: [citizenId], references: [id])
+  assignedOfficerId    String?
+  assignedOfficerName  String?
+  slaHours             Int      @default(24)
+  slaDeadline          DateTime
+  aiConfidence         Float?
+  aiSuggestedCategory  String?
+  aiReasoning          String?
+  aiLanguage           String?
+  issueClusterId       String?
+  duplicateOfId        String?
+  duplicateOf          Complaint? @relation("ComplaintDuplicates", fields: [duplicateOfId], references: [id])
+  duplicates           Complaint[] @relation("ComplaintDuplicates")
+  resolutionRemarks    String?
+  resolutionImageUrl   String?
+  resolvedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  timeline             ComplaintTimeline[]
+
+  @@index([citizenId, createdAt])
+  @@index([issueClusterId])
+  @@index([latitude, longitude])
+  @@index([status, priority])
+}
+
+model ComplaintTimeline {
+  id          String     @id @default(uuid())
+  complaintId String
+  complaint   Complaint  @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  status      String
+  note        String
+  author      String
+  authorRole  String     @default("SYSTEM")
+  createdAt   DateTime   @default(now())
+
+  @@index([complaintId, createdAt])
+}
+
+model OtpVerification {
+  id          String   @id @default(uuid())
+  phoneNumber String
+  otpCode     String
+  verified    Boolean  @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([phoneNumber, createdAt])
+  @@index([phoneNumber, otpCode, verified, expiresAt])
 }

@@ -9,13 +9,15 @@ export type ComplaintPriority = "VERY_HIGH" | "HIGH" | "MEDIUM" | "LOW";
 export type ComplaintStatus =
   | "SUBMITTED"
   | "VALIDATING"
+  | "UNDER_REVIEW"
   | "ASSIGNED"
   | "IN_PROGRESS"
   | "RESOLVED"
   | "CITIZEN_VERIFICATION"
   | "CLOSED"
   | "REOPENED"
-  | "ESCALATED";
+  | "ESCALATED"
+  | "REJECTED";
 
 export interface TimelineEvent {
   status: ComplaintStatus;
@@ -38,6 +40,19 @@ export interface ResolutionEvidence {
   uploadedAt: string;
   uploadedBy: string;
   inspectionPassed: boolean;
+}
+
+export interface CitizenFeedback {
+  complaintId: string;
+  trackingNumber: string;
+  citizenMobile: string;
+  rating: number;
+  satisfactionLevel: "VERY_SATISFIED" | "SATISFIED" | "NEUTRAL" | "DISSATISFIED";
+  resolutionQualityRating: number;
+  responseTimeRating: number;
+  comments: string;
+  submittedAt: string;
+  reopenRequested: boolean;
 }
 
 export interface Complaint {
@@ -82,4 +97,5 @@ export interface Complaint {
   timeline: TimelineEvent[];
   routingAuditTrail: RoutingAuditStep[];
   resolutionEvidence?: ResolutionEvidence;
+  feedback?: CitizenFeedback;
 }

@@ -84,6 +84,20 @@ export function StatusBadge({
       border: "border-[#FECACA]",
       dot: "bg-[#DC2626]",
     },
+    UNDER_REVIEW: {
+      label: "UNDER REVIEW",
+      bg: "bg-[#F3E8FF]",
+      text: "text-[#5B21B6]",
+      border: "border-[#DDD6FE]",
+      dot: "bg-[#5B21B6]",
+    },
+    REJECTED: {
+      label: "REJECTED",
+      bg: "bg-[#FEF2F2]",
+      text: "text-[#B91C1C]",
+      border: "border-[#FECACA]",
+      dot: "bg-[#DC2626]",
+    },
   };
 
   const current = statusConfig[status] || statusConfig.SUBMITTED;
