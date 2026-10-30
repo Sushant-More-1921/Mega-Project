@@ -1,0 +1,64 @@
+complaint_type,descriptor,expected_category,predicted_category,category_confidence,priority,priority_confidence,correct
+Sewer,Sewer Backup (Use Comments) (SA),Drainage,Drainage,0.4521,Low,0.9965,True
+Street Light Condition,Street Light Out,Streetlight,Streetlight,0.9797,Low,0.6539,True
+Street Condition,Pothole,Road/Pothole,Road/Pothole,0.9852,Low,0.9965,True
+Street Light Condition,Street Light Cycling,Streetlight,Streetlight,0.9797,Low,0.6539,True
+Sewer,Street Flooding (SJ),Drainage,Streetlight,0.9342,High,0.9861,False
+Water System,Excessive Water In Basement (WEFB),Water,Water,0.9896,Low,0.9966,True
+Sewer,Catch Basin Clogged/Flooding (Use Comments) (SC),Drainage,Drainage,0.8044,High,0.9764,True
+Water System,No Water (WNW),Water,Water,0.9932,High,0.9981,True
+Water System,Dirty Water (WE),Water,Water,0.5113,Low,0.993,True
+Street Light Condition,Lamppost Knocked Down,Streetlight,Drainage,0.4521,Low,0.9965,False
+Water System,Leak (Use Comments) (WA2),Water,Drainage,0.4521,Low,0.9965,False
+Sewer,Manhole Cover Missing (Emergency) (SA3),Drainage,Drainage,0.3717,Critical,0.8919,True
+Sewer,Manhole Overflow (Use Comments) (SA1),Drainage,Garbage,0.8804,Low,0.9975,False
+Water System,LOW WATER PRESSURE - WLWP,Water,Water,0.9981,Low,0.9957,True
+Air Quality,"Air: Smoke, Chimney or vent (AS1)",Pollution,Pollution,0.9935,Low,0.9989,True
+Air Quality,"Air: Odor/Fumes, Vehicle Idling (AD3)",Pollution,Pollution,0.9419,Low,0.9984,True
+Water System,Hydrant Running (WC3),Water,Drainage,0.4521,Low,0.9965,False
+Water System,Possible Water Main Break (Use Comments) (WA1),Water,Water,0.9896,Low,0.9954,True
+Air Quality,"Air: Odor/Fumes, Restaurant (AD2)",Pollution,Pollution,0.9914,Low,0.9988,True
+Sewer,Catch Basin Search (SC2),Drainage,Drainage,0.4521,Low,0.9965,True
+Sewer,Culvert Blocked/Needs Cleaning (SE),Drainage,Drainage,0.977,High,0.9736,True
+Water System,Hydrant Leaking (WC1),Water,Drainage,0.685,Low,0.7921,False
+Air Quality,"Air: Odor, Sweet From Unknown Source (AZ1)",Pollution,Pollution,0.9849,Low,0.9984,True
+Street Light Condition,Lamppost Missing,Streetlight,Drainage,0.4521,Low,0.9965,False
+Street Light Condition,Street Light Dayburning,Streetlight,Streetlight,0.9797,Low,0.6539,True
+Water System,Hydrant Knocked Over/Missing (WC),Water,Drainage,0.4521,Low,0.9965,False
+Sewer,Sewer Odor (SA2),Drainage,Drainage,0.4521,Low,0.9965,True
+Sewer,RAIN GARDEN STRUCTURE (GIRGS),Drainage,Drainage,0.4521,Low,0.9965,True
+Water System,Hydrant Running Full (WA4),Water,Drainage,0.3344,Low,0.9953,False
+Water System,Hydrant Defective (WC2),Water,Drainage,0.4521,Low,0.9965,False
+Sewer,Catch Basin Sunken/Damaged/Raised (SC1),Drainage,Road/Pothole,0.7959,Medium,0.999,False
+Street Light Condition,Traffic Signal Light,Streetlight,Streetlight,0.5662,Low,0.983,True
+Street Light Condition,Fixture/Luminaire Hanging,Streetlight,Drainage,0.4521,Low,0.9965,False
+Street Light Condition,Lamppost Damaged,Streetlight,Road/Pothole,0.7959,Medium,0.999,False
+Street Light Condition,Street Light Lamp Dim,Streetlight,Streetlight,0.9886,Low,0.5532,True
+Street Light Condition,Lamppost Wire Exposed,Streetlight,Drainage,0.4521,Low,0.9965,False
+Air Quality,Air: Other Air Problem (Use Comments) (AZZ),Pollution,Pollution,0.9911,Low,0.9992,True
+Air Quality,"Air: Dust, Construction/Demolition (AE4)",Pollution,Pollution,0.9914,Low,0.9988,True
+Street Light Condition,Street Light Lamp Missing,Streetlight,Streetlight,0.9886,Low,0.5532,True
+Street Light Condition,Multiple Street Lights Out,Streetlight,Streetlight,0.9667,Low,0.99,True
+Sewer,Defective/Missing Curb Piece (SC4),Drainage,Drainage,0.4521,Low,0.9965,True
+Street Light Condition,Lamppost Leaning,Streetlight,Drainage,0.4521,Low,0.9965,False
+Water System,installation of hydrant side post (WHFP),Water,Drainage,0.2779,Low,0.9945,False
+Air Quality,"Air: Smoke, Vehicular (AA4)",Pollution,Pollution,0.9935,Low,0.9989,True
+Sewer,RAIN GARDEN DEBRIS (GIRGD),Drainage,Drainage,0.4521,Low,0.9965,True
+Street Light Condition,Lamppost Base Door/Cover Missing,Streetlight,Drainage,0.4521,Low,0.9965,False
+Street Light Condition,Flood Light Lamp Out,Streetlight,Streetlight,0.9785,Low,0.8215,True
+Street Light Condition,Flood Light Lamp Dim,Streetlight,Streetlight,0.9785,Low,0.8215,True
+Street Light Condition,Fixture/Luminaire Damaged,Streetlight,Road/Pothole,0.7959,Medium,0.999,False
+Air Quality,"Air: Odor, Nail Salon (AD8)",Pollution,Pollution,0.9914,Low,0.9988,True
+Sewer,Catch Basin Grating Missing (SA4),Drainage,Drainage,0.4521,Low,0.9965,True
+Street Light Condition,Foreign Attachment On Lamppost,Streetlight,Garbage,0.3475,Low,0.9957,False
+Street Light Condition,Lamppost Base Door/Cover Open,Streetlight,Drainage,0.4521,Low,0.9965,False
+Street Light Condition,Multiple St Lts Dayburning,Streetlight,Drainage,0.3652,Low,0.9979,False
+Street Light Condition,Fixture/Luminaire Missing,Streetlight,Drainage,0.4521,Low,0.9965,False
+Street Light Condition,Lamppost Base Door/Cover Damaged,Streetlight,Road/Pothole,0.7959,Medium,0.999,False
+Water System,High Water Pressure (WHP),Water,Water,0.998,Low,0.9958,True
+Street Light Condition,Fixture/Luminaire Out Of Position,Streetlight,Drainage,0.2779,Low,0.9945,False
+Street Light Condition,Fixture/Luminaire Door Open,Streetlight,Drainage,0.4521,Low,0.9965,False
+Water System,Hyd Valve Box Cover Missing (WV2),Water,Drainage,0.4521,Low,0.9965,False
+Air Quality,"Air: Dust, Other (Use Comments) (AE5)",Pollution,Pollution,0.9914,Low,0.9988,True
+Street Light Condition,Glassware Hanging,Streetlight,Drainage,0.4521,Low,0.9965,False
+Street Light Condition,Bracket Arm Broken,Streetlight,Streetlight,0.6543,Medium,0.9987,True
